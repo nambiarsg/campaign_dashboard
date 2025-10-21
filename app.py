@@ -40,7 +40,7 @@ if 'last_updated' not in st.session_state:
 def render_header():
     """Render the main header"""
     st.markdown("""
-    <div class="main-header">
+    <div class="dashboard-header">
         <h1>📱 Bloomreach Mobile Push Analytics</h1>
         <p>Professional Performance Dashboard for Mobile Push Campaigns</p>
     </div>
@@ -178,7 +178,7 @@ def render_sidebar():
             st.rerun()
 
 def render_metric_card(title: str, value: str, trend: Dict = None, icon: str = "📊"):
-    """Render a metric card with trend indicator"""
+    """Render a modern metric card with trend indicator"""
     if trend:
         trend_arrow = get_trend_arrow(trend['direction'])
         trend_class = f"trend-{trend['direction']}"
@@ -189,14 +189,16 @@ def render_metric_card(title: str, value: str, trend: Dict = None, icon: str = "
     
     st.markdown(f"""
     <div class="metric-card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="flex: 1;">
                 <p class="metric-label">{title}</p>
                 <p class="metric-value">{value}</p>
+                <div class="metric-trend">
+                    <span class="{trend_class}">{trend_text}</span>
+                </div>
             </div>
-            <div style="text-align: right;">
-                <p style="font-size: 2rem; margin: 0;">{icon}</p>
-                <p class="{trend_class}" style="font-size: 0.8rem; margin: 0;">{trend_text}</p>
+            <div style="font-size: 2.5rem; opacity: 0.7; margin-left: 1rem;">
+                {icon}
             </div>
         </div>
     </div>
@@ -684,8 +686,9 @@ def render_empty_state():
     st.markdown("""
     <div class="empty-state">
         <h3>📱 Welcome to Bloomreach Mobile Push Analytics</h3>
-        <p>Upload your CSV files to get started with comprehensive mobile push campaign analysis.</p>
+        <p>Upload your data files to get started with comprehensive mobile push campaign analysis.</p>
         <p>Use the sidebar to upload the required data files and begin exploring your campaign performance.</p>
+        <p><strong>Get insights into revenue, CTR, delivery rates, AOV, and purchase conversions.</strong></p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -700,19 +703,23 @@ def main():
         return
     
     # Render dashboard content
-    st.markdown("## 📊 Section 1: Overall Health")
+    st.markdown('<h2 class="section-header">📊 Section 1: Overall Health</h2>', unsafe_allow_html=True)
     render_metrics_cards()
     
-    st.markdown("## 📈 Performance Trends")
+    st.markdown('<h2 class="section-header">📈 Performance Trends</h2>', unsafe_allow_html=True)
     
     # Charts in two columns
     col1, col2 = st.columns(2)
     
     with col1:
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         render_revenue_trend_chart()
+        st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
+        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
         render_purchases_trend_chart()
+        st.markdown('</div>', unsafe_allow_html=True)
     
     # Download section
     render_download_section()
