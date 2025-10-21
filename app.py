@@ -28,6 +28,16 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Add cache busting to prevent old UI from showing
+st.markdown("""
+<script>
+    // Force reload if this is an old version
+    if (window.location.search.indexOf('v=') === -1) {
+        window.location.href = window.location.href + '?v=' + Date.now();
+    }
+</script>
+""", unsafe_allow_html=True)
+
 # Apply custom CSS
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
@@ -43,6 +53,7 @@ def render_header():
     <div class="dashboard-header">
         <h1>📱 Bloomreach Mobile Push Analytics</h1>
         <p>Professional Performance Dashboard for Mobile Push Campaigns</p>
+        <p style="font-size: 0.9rem; opacity: 0.8; margin-top: 1rem;">Version 2.0 - Modern UI</p>
     </div>
     """, unsafe_allow_html=True)
     
