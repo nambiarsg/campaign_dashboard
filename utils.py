@@ -315,11 +315,13 @@ def validate_uploaded_files(uploaded_files: List) -> Tuple[bool, List[str]]:
             
             if filename in required_files:
                 from config import FILE_COLUMNS
-                required_columns = list(FILE_COLUMNS[filename].keys())
-                missing_columns = [col for col in required_columns if col not in df.columns]
+                # Get the actual column names that should be in the CSV files
+                expected_columns = list(FILE_COLUMNS[filename].values())
+                actual_columns = list(df.columns)
+                missing_columns = [col for col in expected_columns if col not in actual_columns]
                 
                 if missing_columns:
-                    errors.append(f"{filename}: Missing columns {missing_columns}")
+                    errors.append(f"{filename}: Missing columns {missing_columns}. Found columns: {actual_columns}")
         
         except Exception as e:
             errors.append(f"Error reading {uploaded_file.name}: {str(e)}")
