@@ -1,0 +1,614 @@
+"""
+Bloomreach Mobile Push Performance Analytics Dashboard
+A professional Streamlit dashboard for analyzing mobile push campaign performance
+"""
+
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from datetime import datetime, timedelta
+import io
+from typing import Dict, List, Tuple
+
+# Import custom modules
+from config import COLORS, CHART_COLORS, THRESHOLDS, CUSTOM_CSS, CHART_CONFIG, DATE_RANGES
+from utils import (
+    process_csv_file, calculate_metrics_summary, validate_uploaded_files,
+    format_currency, format_number, format_percentage, get_trend_arrow,
+    get_date_range_data
+)
+
+# Page configuration
+st.set_page_config(
+    page_title="Bloomreach Mobile Push Analytics",
+    page_icon="📱",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Apply custom CSS
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# Initialize session state
+if 'uploaded_data' not in st.session_state:
+    st.session_state.uploaded_data = {}
+if 'last_updated' not in st.session_state:
+    st.session_state.last_updated = None
+
+def render_header():
+    """Render the main header"""
+    st.markdown("""
+    <div class="main-header">
+        <h1>📱 Bloomreach Mobile Push Analytics</h1>
+        <p>Professional Performance Dashboard for Mobile Push Campaigns</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.session_state.last_updated:
+        st.caption(f"Last updated: {st.session_state.last_updated}")
+
+def render_sidebar():
+    """Render the sidebar with file upload and controls"""
+    st.sidebar.title("📊 Dashboard Controls")
+    
+    # File upload section
+    st.sidebar.markdown("### 📁 Upload Data Files")
+    st.sidebar.markdown("""
+    <div class="upload-section">
+        <p><strong>Required Files:</strong></p>
+        <ul>
+            <li>aovmobilepush.csv</li>
+            <li>ctrrate.csv</li>
+            <li>deliveryrate.csv</li>
+            <li>noofcustomerswithpurchasesattributedtopush.csv</li>
+            <li>noofpurchasesattributedtopush.csv</li>
+            <li>promotionalcampaignlevelperformancepush.csv</li>
+            <li>revenue.csv</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    uploaded_files = st.sidebar.file_uploader(
+        "Choose CSV files",
+        type=['csv'],
+        accept_multiple_files=True,
+        help="Upload all required CSV files for analysis"
+    )
+    
+    # Process uploaded files
+    if uploaded_files:
+        # Validate files
+        is_valid, errors = validate_uploaded_files(uploaded_files)
+        
+        if not is_valid:
+            for error in errors:
+                st.sidebar.error(f"❌ {error}")
+        else:
+            # Process and store data
+            processed_data = {}
+            for uploaded_file in uploaded_files:
+                try:
+                    df = pd.read_csv(uploaded_file)
+                    processed_df = process_csv_file(df, uploaded_file.name)
+                    processed_data[uploaded_file.name] = processed_df
+                    st.sidebar.success(f"✅ {uploaded_file.name} processed successfully")
+                except Exception as e:
+                    st.sidebar.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
+            
+            if processed_data:
+                st.session_state.uploaded_data = processed_data
+                st.session_state.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                st.sidebar.success("🎉 All files processed successfully!")
+    
+    # Date range filter
+    st.sidebar.markdown("### 📅 Date Range Filter")
+    
+    if st.session_state.uploaded_data:
+        # Get date range from data
+        all_dates = []
+        for df in st.session_state.uploaded_data.values():
+            if 'timestamp' in df.columns and not df.empty:
+                all_dates.extend(df['timestamp'].dropna().tolist())
+        
+        if all_dates:
+            min_date = min(all_dates)
+            max_date = max(all_dates)
+            
+            # Quick select buttons
+            col1, col2 = st.sidebar.columns(2)
+            with col1:
+                if st.button("7 Days"):
+                    st.session_state.date_range = (max_date - timedelta(days=7), max_date)
+            with col2:
+                if st.button("30 Days"):
+                    st.session_state.date_range = (max_date - timedelta(days=30), max_date)
+            
+            col3, col4 = st.sidebar.columns(2)
+            with col3:
+                if st.button("90 Days"):
+                    st.session_state.date_range = (max_date - timedelta(days=90), max_date)
+            with col4:
+                if st.button("All Time"):
+                    st.session_state.date_range = (min_date, max_date)
+            
+            # Date picker
+            date_range = st.sidebar.date_input(
+                "Select Date Range",
+                value=(min_date.date(), max_date.date()),
+                min_value=min_date.date(),
+                max_value=max_date.date()
+            )
+            
+            if len(date_range) == 2:
+                start_date = datetime.combine(date_range[0], datetime.min.time())
+                end_date = datetime.combine(date_range[1], datetime.max.time())
+                st.session_state.date_range = (start_date, end_date)
+    
+    # Clear data button
+    if st.session_state.uploaded_data:
+        st.sidebar.markdown("### 🗑️ Data Management")
+        if st.sidebar.button("Clear All Data", type="secondary"):
+            st.session_state.uploaded_data = {}
+            st.session_state.last_updated = None
+            st.session_state.date_range = None
+            st.rerun()
+
+def render_metric_card(title: str, value: str, trend: Dict = None, icon: str = "📊"):
+    """Render a metric card with trend indicator"""
+    if trend:
+        trend_arrow = get_trend_arrow(trend['direction'])
+        trend_class = f"trend-{trend['direction']}"
+        trend_text = f"{trend_arrow} {trend['percentage']:.1f}%"
+    else:
+        trend_class = "trend-neutral"
+        trend_text = "➡️ No data"
+    
+    st.markdown(f"""
+    <div class="metric-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <p class="metric-label">{title}</p>
+                <p class="metric-value">{value}</p>
+            </div>
+            <div style="text-align: right;">
+                <p style="font-size: 2rem; margin: 0;">{icon}</p>
+                <p class="{trend_class}" style="font-size: 0.8rem; margin: 0;">{trend_text}</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+def render_metrics_cards():
+    """Render the key metrics cards"""
+    if not st.session_state.uploaded_data:
+        return
+    
+    # Calculate metrics
+    date_range = st.session_state.get('date_range', None)
+    summary = calculate_metrics_summary(st.session_state.uploaded_data, date_range)
+    
+    # Create columns for metrics
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        # Total Revenue
+        revenue = summary.get('total_revenue', 0)
+        revenue_trend = summary.get('revenue_trend', {})
+        render_metric_card(
+            "Total Revenue",
+            format_currency(revenue),
+            revenue_trend,
+            "💰"
+        )
+        
+        # Total Purchases
+        purchases = summary.get('total_purchases', 0)
+        purchases_trend = summary.get('purchases_trend', {})
+        render_metric_card(
+            "Total Purchases",
+            format_number(purchases),
+            purchases_trend,
+            "🛒"
+        )
+    
+    with col2:
+        # Total Buyers
+        buyers = summary.get('total_buyers', 0)
+        buyers_trend = summary.get('buyers_trend', {})
+        render_metric_card(
+            "Total Buyers",
+            format_number(buyers),
+            buyers_trend,
+            "👥"
+        )
+        
+        # Average AOV
+        aov = summary.get('avg_aov', 0)
+        aov_trend = summary.get('aov_trend', {})
+        render_metric_card(
+            "Average AOV",
+            format_currency(aov),
+            aov_trend,
+            "💳"
+        )
+    
+    with col3:
+        # Average CTR
+        ctr = summary.get('avg_ctr', 0)
+        ctr_trend = summary.get('ctr_trend', {})
+        render_metric_card(
+            "Average CTR",
+            format_percentage(ctr),
+            ctr_trend,
+            "👆"
+        )
+        
+        # Average Delivery Rate
+        delivery_rate = summary.get('avg_delivery_rate', 0)
+        delivery_rate_trend = summary.get('delivery_rate_trend', {})
+        render_metric_card(
+            "Average Delivery Rate",
+            format_percentage(delivery_rate),
+            delivery_rate_trend,
+            "📨"
+        )
+
+def render_revenue_chart():
+    """Render revenue trend chart"""
+    if 'revenue.csv' not in st.session_state.uploaded_data:
+        return
+    
+    revenue_df = st.session_state.uploaded_data['revenue.csv']
+    
+    # Apply date filter if set
+    if st.session_state.get('date_range'):
+        start_date, end_date = st.session_state.date_range
+        revenue_df = get_date_range_data(revenue_df, start_date, end_date)
+    
+    if revenue_df.empty:
+        return
+    
+    fig = px.line(
+        revenue_df,
+        x='timestamp',
+        y='value',
+        title='Revenue Trend Over Time',
+        color_discrete_sequence=[CHART_COLORS['revenue']]
+    )
+    
+    fig.update_layout(
+        xaxis_title="Date",
+        yaxis_title="Revenue ($)",
+        hovermode='x unified',
+        showlegend=False,
+        height=400
+    )
+    
+    fig.update_traces(
+        line=dict(width=3),
+        marker=dict(size=6)
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+
+def render_purchases_buyers_chart():
+    """Render purchases and buyers dual-axis chart"""
+    purchases_df = st.session_state.uploaded_data.get('noofpurchasesattributedtopush.csv', pd.DataFrame())
+    buyers_df = st.session_state.uploaded_data.get('noofcustomerswithpurchasesattributedtopush.csv', pd.DataFrame())
+    
+    if purchases_df.empty and buyers_df.empty:
+        return
+    
+    # Apply date filter if set
+    if st.session_state.get('date_range'):
+        start_date, end_date = st.session_state.date_range
+        if not purchases_df.empty:
+            purchases_df = get_date_range_data(purchases_df, start_date, end_date)
+        if not buyers_df.empty:
+            buyers_df = get_date_range_data(buyers_df, start_date, end_date)
+    
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    # Add purchases line
+    if not purchases_df.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=purchases_df['timestamp'],
+                y=purchases_df['value'],
+                name='Purchases',
+                line=dict(color=CHART_COLORS['purchases'], width=3),
+                marker=dict(size=6)
+            ),
+            secondary_y=False,
+        )
+    
+    # Add buyers line
+    if not buyers_df.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=buyers_df['timestamp'],
+                y=buyers_df['value'],
+                name='Buyers',
+                line=dict(color=CHART_COLORS['buyers'], width=3),
+                marker=dict(size=6)
+            ),
+            secondary_y=True,
+        )
+    
+    # Update layout
+    fig.update_layout(
+        title_text="Purchases & Buyers Over Time",
+        height=400,
+        hovermode='x unified'
+    )
+    
+    fig.update_xaxes(title_text="Date")
+    fig.update_yaxes(title_text="Purchases", secondary_y=False)
+    fig.update_yaxes(title_text="Buyers", secondary_y=True)
+    
+    st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+
+def render_ctr_delivery_chart():
+    """Render CTR and delivery rate chart"""
+    ctr_df = st.session_state.uploaded_data.get('ctrrate.csv', pd.DataFrame())
+    delivery_df = st.session_state.uploaded_data.get('deliveryrate.csv', pd.DataFrame())
+    
+    if ctr_df.empty and delivery_df.empty:
+        return
+    
+    # Apply date filter if set
+    if st.session_state.get('date_range'):
+        start_date, end_date = st.session_state.date_range
+        if not ctr_df.empty:
+            ctr_df = get_date_range_data(ctr_df, start_date, end_date)
+        if not delivery_df.empty:
+            delivery_df = get_date_range_data(delivery_df, start_date, end_date)
+    
+    fig = go.Figure()
+    
+    # Add CTR line
+    if not ctr_df.empty:
+        fig.add_trace(go.Scatter(
+            x=ctr_df['timestamp'],
+            y=ctr_df['value'],
+            name='Click Through Rate',
+            line=dict(color=CHART_COLORS['ctr'], width=3),
+            marker=dict(size=6)
+        ))
+    
+    # Add delivery rate line
+    if not delivery_df.empty:
+        fig.add_trace(go.Scatter(
+            x=delivery_df['timestamp'],
+            y=delivery_df['value'],
+            name='Delivery Rate',
+            line=dict(color=CHART_COLORS['delivery_rate'], width=3),
+            marker=dict(size=6)
+        ))
+    
+    fig.update_layout(
+        title="CTR & Delivery Rate Over Time",
+        xaxis_title="Date",
+        yaxis_title="Percentage (%)",
+        height=400,
+        hovermode='x unified'
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+
+def render_aov_chart():
+    """Render AOV area chart"""
+    if 'aovmobilepush.csv' not in st.session_state.uploaded_data:
+        return
+    
+    aov_df = st.session_state.uploaded_data['aovmobilepush.csv']
+    
+    # Apply date filter if set
+    if st.session_state.get('date_range'):
+        start_date, end_date = st.session_state.date_range
+        aov_df = get_date_range_data(aov_df, start_date, end_date)
+    
+    if aov_df.empty:
+        return
+    
+    fig = px.area(
+        aov_df,
+        x='timestamp',
+        y='value',
+        title='Average Order Value (AOV) Over Time',
+        color_discrete_sequence=[CHART_COLORS['aov']]
+    )
+    
+    fig.update_layout(
+        xaxis_title="Date",
+        yaxis_title="AOV ($)",
+        hovermode='x unified',
+        showlegend=False,
+        height=400
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+
+def render_campaign_performance_table():
+    """Render campaign performance table"""
+    if 'promotionalcampaignlevelperformancepush.csv' not in st.session_state.uploaded_data:
+        return
+    
+    campaign_df = st.session_state.uploaded_data['promotionalcampaignlevelperformancepush.csv']
+    
+    if campaign_df.empty:
+        return
+    
+    # Apply conditional formatting
+    def highlight_ctr(val):
+        if pd.isna(val):
+            return ''
+        if val > THRESHOLDS['ctr_high']:
+            return 'background-color: #d4edda; color: #155724'
+        elif val < THRESHOLDS['ctr_low']:
+            return 'background-color: #f8d7da; color: #721c24'
+        return ''
+    
+    def highlight_delivery_rate(val):
+        if pd.isna(val):
+            return ''
+        if val > THRESHOLDS['delivery_rate_high']:
+            return 'background-color: #d4edda; color: #155724'
+        elif val < THRESHOLDS['delivery_rate_low']:
+            return 'background-color: #f8d7da; color: #721c24'
+        return ''
+    
+    # Format the dataframe for display
+    display_df = campaign_df.copy()
+    
+    # Format percentage columns
+    if '#3 Delivery Rate' in display_df.columns:
+        display_df['#3 Delivery Rate'] = display_df['#3 Delivery Rate'].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
+    if '#4 Click Through Rate' in display_df.columns:
+        display_df['#4 Click Through Rate'] = display_df['#4 Click Through Rate'].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
+    
+    # Sort by delivered messages (descending)
+    if '#1 All Delivered' in display_df.columns:
+        display_df = display_df.sort_values('#1 All Delivered', ascending=False)
+    
+    st.markdown("### 📊 Campaign Performance Table")
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+def render_campaign_performance_chart():
+    """Render top campaigns bar chart"""
+    if 'promotionalcampaignlevelperformancepush.csv' not in st.session_state.uploaded_data:
+        return
+    
+    campaign_df = st.session_state.uploaded_data['promotionalcampaignlevelperformancepush.csv']
+    
+    if campaign_df.empty or 'campaign_name' not in campaign_df.columns or '#1 All Delivered' not in campaign_df.columns:
+        return
+    
+    # Get top 10 campaigns by delivered messages
+    top_campaigns = campaign_df.nlargest(10, '#1 All Delivered')
+    
+    fig = px.bar(
+        top_campaigns,
+        x='#1 All Delivered',
+        y='campaign_name',
+        orientation='h',
+        title='Top 10 Campaigns by Delivered Messages',
+        color='#1 All Delivered',
+        color_continuous_scale='Blues'
+    )
+    
+    fig.update_layout(
+        xaxis_title="Messages Delivered",
+        yaxis_title="Campaign Name",
+        height=500,
+        showlegend=False
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+
+def render_download_section():
+    """Render download reports section"""
+    if not st.session_state.uploaded_data:
+        return
+    
+    st.markdown("### 📥 Download Reports")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📊 Download Summary Report (CSV)"):
+            # Create summary report
+            date_range = st.session_state.get('date_range', None)
+            summary = calculate_metrics_summary(st.session_state.uploaded_data, date_range)
+            
+            # Convert to DataFrame
+            summary_df = pd.DataFrame([summary])
+            
+            # Convert to CSV
+            csv = summary_df.to_csv(index=False)
+            
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name=f"bloomreach_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+    
+    with col2:
+        if st.button("📈 Download All Data (Excel)"):
+            # Create Excel file with multiple sheets
+            output = io.BytesIO()
+            
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                for filename, df in st.session_state.uploaded_data.items():
+                    sheet_name = filename.replace('.csv', '')[:31]  # Excel sheet name limit
+                    df.to_excel(writer, sheet_name=sheet_name, index=False)
+            
+            output.seek(0)
+            
+            st.download_button(
+                label="Download Excel",
+                data=output.getvalue(),
+                file_name=f"bloomreach_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+def render_empty_state():
+    """Render empty state when no data is uploaded"""
+    st.markdown("""
+    <div class="empty-state">
+        <h3>📱 Welcome to Bloomreach Mobile Push Analytics</h3>
+        <p>Upload your CSV files to get started with comprehensive mobile push campaign analysis.</p>
+        <p>Use the sidebar to upload the required data files and begin exploring your campaign performance.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def main():
+    """Main application function"""
+    render_header()
+    render_sidebar()
+    
+    # Check if data is uploaded
+    if not st.session_state.uploaded_data:
+        render_empty_state()
+        return
+    
+    # Render dashboard content
+    st.markdown("## 📊 Key Performance Metrics")
+    render_metrics_cards()
+    
+    st.markdown("## 📈 Performance Trends")
+    
+    # Charts in two columns
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        render_revenue_chart()
+        render_aov_chart()
+    
+    with col2:
+        render_purchases_buyers_chart()
+        render_ctr_delivery_chart()
+    
+    # Campaign performance section
+    st.markdown("## 🎯 Campaign Performance")
+    
+    col3, col4 = st.columns([2, 1])
+    
+    with col3:
+        render_campaign_performance_table()
+    
+    with col4:
+        render_campaign_performance_chart()
+    
+    # Download section
+    render_download_section()
+
+if __name__ == "__main__":
+    main()
