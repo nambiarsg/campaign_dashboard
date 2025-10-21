@@ -64,11 +64,14 @@ def render_sidebar():
     <div class="upload-section">
         <p><strong>Required files (any extension):</strong></p>
         <ul>
-            <li><strong>push revenue</strong><br/>Columns: timestamp, revenue</li>
-            <li><strong>pushctr</strong><br/>Columns: timestamp, ctr</li>
+            <li><strong>pushsends</strong><br/>Columns: timestamp, sends</li>
             <li><strong>pushdeliveryrate</strong><br/>Columns: timestamp, delivery rate</li>
-            <li><strong>pushaov</strong><br/>Columns: timestamp, aov</li>
+            <li><strong>openrate</strong><br/>Columns: timestamp, open rate</li>
+            <li><strong>pushctr</strong><br/>Columns: timestamp, ctr</li>
             <li><strong>noofpurchasesattributedtopush</strong><br/>Columns: timestamp, Purchases</li>
+            <li><strong>push revenue</strong><br/>Columns: timestamp, revenue</li>
+            <li><strong>optout</strong><br/>Columns: timestamp, optout rate</li>
+            <li><strong>campaigns</strong><br/>Campaign performance data</li>
         </ul>
         <p><em>Works with .csv, .numbers, .xlsx, etc.</em></p>
     </div>
@@ -210,78 +213,99 @@ def render_metric_card(title: str, value: str, trend: Dict = None, icon: str = "
     """, unsafe_allow_html=True)
 
 def render_metrics_cards():
-    """Render the key metrics cards"""
+    """Render the 8 key push notification metrics"""
     if not hasattr(st.session_state, 'uploaded_data') or not st.session_state.uploaded_data:
         return
     
     # Calculate metrics
     date_range = st.session_state.get('date_range', None)
-    summary = calculate_metrics_summary(st.session_state.uploaded_data, date_range)
+    summary = calculate_push_metrics_summary(st.session_state.uploaded_data, date_range)
     
-    # Create columns for metrics
-    col1, col2, col3 = st.columns(3)
+    # Create 4 columns for 8 metrics (2 rows of 4)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        # Total Revenue
-        revenue = summary.get('total_revenue', 0)
+        # 1. Total Push Sends
+        sends = summary.get('total_sends', 0)
+        sends_trend = summary.get('sends_trend', {})
+        render_metric_card(
+            "Total Push Sends",
+            format_number(sends),
+            sends_trend,
+            "📤"
+        )
+        
+        # 5. Conversion Rate
+        conversion_rate = summary.get('conversion_rate', 0)
+        conversion_trend = summary.get('conversion_trend', {})
+        render_metric_card(
+            "Conversion Rate (%)",
+            format_percentage(conversion_rate),
+            conversion_trend,
+            "🎯"
+        )
+    
+    with col2:
+        # 2. Delivery Rate
+        delivery_rate = summary.get('delivery_rate', 0)
+        delivery_trend = summary.get('delivery_trend', {})
+        render_metric_card(
+            "Delivery Rate (%)",
+            format_percentage(delivery_rate),
+            delivery_trend,
+            "📨"
+        )
+        
+        # 6. Revenue from Push
+        revenue = summary.get('revenue_from_push', 0)
         revenue_trend = summary.get('revenue_trend', {})
         render_metric_card(
-            "Total Revenue",
+            "Revenue from Push (AED)",
             format_currency(revenue),
             revenue_trend,
             "💰"
         )
-        
-        # Total Purchases
-        purchases = summary.get('total_purchases', 0)
-        purchases_trend = summary.get('purchases_trend', {})
-        render_metric_card(
-            "Total Purchases",
-            format_number(purchases),
-            purchases_trend,
-            "🛒"
-        )
-    
-    with col2:
-        # Total Buyers
-        buyers = summary.get('total_buyers', 0)
-        buyers_trend = summary.get('buyers_trend', {})
-        render_metric_card(
-            "Total Buyers",
-            format_number(buyers),
-            buyers_trend,
-            "👥"
-        )
-        
-        # Average AOV
-        aov = summary.get('avg_aov', 0)
-        aov_trend = summary.get('aov_trend', {})
-        render_metric_card(
-            "Average AOV (Average Order Value)",
-            format_currency(aov),
-            aov_trend,
-            "💳"
-        )
     
     with col3:
-        # Average CTR
-        ctr = summary.get('avg_ctr', 0)
+        # 3. Open Rate
+        open_rate = summary.get('open_rate', 0)
+        open_trend = summary.get('open_trend', {})
+        render_metric_card(
+            "Open Rate (%)",
+            format_percentage(open_rate),
+            open_trend,
+            "👁️"
+        )
+        
+        # 7. Opt-out Rate
+        optout_rate = summary.get('optout_rate', 0)
+        optout_trend = summary.get('optout_trend', {})
+        render_metric_card(
+            "Opt-out Rate (%)",
+            format_percentage(optout_rate),
+            optout_trend,
+            "🚫"
+        )
+    
+    with col4:
+        # 4. Click-Through Rate
+        ctr = summary.get('ctr', 0)
         ctr_trend = summary.get('ctr_trend', {})
         render_metric_card(
-            "Average CTR (Click Through Rate)",
+            "Click-Through Rate (%)",
             format_percentage(ctr),
             ctr_trend,
             "👆"
         )
         
-        # Average Delivery Rate
-        delivery_rate = summary.get('avg_delivery_rate', 0)
-        delivery_rate_trend = summary.get('delivery_rate_trend', {})
+        # 8. Top Performing Campaigns
+        top_campaigns = summary.get('top_campaigns_count', 0)
+        campaigns_trend = summary.get('campaigns_trend', {})
         render_metric_card(
-            "Average Delivery Rate",
-            format_percentage(delivery_rate),
-            delivery_rate_trend,
-            "📨"
+            "Top Performing Campaigns",
+            f"{top_campaigns} Active",
+            campaigns_trend,
+            "🏆"
         )
 
 def render_revenue_trend_chart():
@@ -705,7 +729,7 @@ def render_empty_state():
         <h3>📱 Welcome to Bloomreach Mobile Push Analytics</h3>
         <p>Upload your data files to get started with comprehensive mobile push campaign analysis.</p>
         <p>Use the sidebar to upload the required data files and begin exploring your campaign performance.</p>
-        <p><strong>Get insights into revenue, CTR, delivery rates, AOV, and purchase conversions.</strong></p>
+        <p><strong>Get insights into push sends, delivery rates, open rates, CTR, conversions, revenue, opt-outs, and top campaigns.</strong></p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -720,7 +744,7 @@ def main():
         return
     
     # Render dashboard content
-    st.markdown('<h2 class="section-header">📊 Section 1: Overall Health</h2>', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-header">📱 PUSH NOTIFICATIONS — Daily Metrics</h2>', unsafe_allow_html=True)
     render_metrics_cards()
     
     st.markdown('<h2 class="section-header">📈 Performance Trends</h2>', unsafe_allow_html=True)

@@ -147,9 +147,9 @@ def get_date_range_data(df: pd.DataFrame, start_date: datetime, end_date: dateti
     mask = (df['timestamp'] >= start_date) & (df['timestamp'] <= end_date)
     return df[mask].copy()
 
-def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[datetime, datetime] = None) -> Dict:
+def calculate_push_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[datetime, datetime] = None) -> Dict:
     """
-    Calculate summary metrics from uploaded data based on specific file requirements
+    Calculate the 8 key push notification metrics for stakeholders
     """
     summary = {}
     
@@ -162,43 +162,92 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
     else:
         filtered_data = data
     
-    # 1. Revenue metrics from push revenue file
-    revenue_file = None
-    for filename in filtered_data.keys():
-        if 'push revenue' in filename.lower():
-            revenue_file = filename
-            break
+    # Find data files
+    files = {}
+    for filename, df in filtered_data.items():
+        filename_lower = filename.lower()
+        if 'push revenue' in filename_lower:
+            files['revenue'] = df
+        elif 'pushctr' in filename_lower:
+            files['ctr'] = df
+        elif 'pushdeliveryrate' in filename_lower:
+            files['delivery'] = df
+        elif 'pushaov' in filename_lower:
+            files['aov'] = df
+        elif 'noofpurchasesattributedtopush' in filename_lower:
+            files['purchases'] = df
+        elif 'pushsends' in filename_lower or 'sends' in filename_lower:
+            files['sends'] = df
+        elif 'opens' in filename_lower or 'openrate' in filename_lower:
+            files['opens'] = df
+        elif 'optout' in filename_lower or 'unsubscribe' in filename_lower:
+            files['optout'] = df
+        elif 'campaign' in filename_lower:
+            files['campaigns'] = df
     
-    if revenue_file and not filtered_data[revenue_file].empty:
-        revenue_df = filtered_data[revenue_file]
-        # Find revenue column
-        revenue_col = None
-        for col in revenue_df.columns:
-            if 'revenue' in col.lower() and col.lower() != 'timestamp':
-                revenue_col = col
+    # 1. Total Push Sends
+    if 'sends' in files and not files['sends'].empty:
+        sends_df = files['sends']
+        sends_col = None
+        for col in sends_df.columns:
+            if ('send' in col.lower() or 'sent' in col.lower()) and col.lower() != 'timestamp':
+                sends_col = col
                 break
         
-        if revenue_col:
-            summary['total_revenue'] = revenue_df[revenue_col].sum()
-            if len(revenue_df) > 1:
-                mid_point = len(revenue_df) // 2
-                current_period = revenue_df.iloc[mid_point:][revenue_col].sum()
-                previous_period = revenue_df.iloc[:mid_point][revenue_col].sum()
+        if sends_col:
+            summary['total_sends'] = sends_df[sends_col].sum()
+            if len(sends_df) > 1:
+                mid_point = len(sends_df) // 2
+                current_period = sends_df.iloc[mid_point:][sends_col].sum()
+                previous_period = sends_df.iloc[:mid_point][sends_col].sum()
                 trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                summary['revenue_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+                summary['sends_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
             else:
-                summary['revenue_trend'] = {'percentage': 0, 'direction': 'neutral'}
+                summary['sends_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
-    # 2. CTR metrics from pushctr file
-    ctr_file = None
-    for filename in filtered_data.keys():
-        if 'pushctr' in filename.lower():
-            ctr_file = filename
-            break
+    # 2. Delivery Rate (%)
+    if 'delivery' in files and not files['delivery'].empty:
+        delivery_df = files['delivery']
+        delivery_col = None
+        for col in delivery_df.columns:
+            if 'delivery' in col.lower() and col.lower() != 'timestamp':
+                delivery_col = col
+                break
+        
+        if delivery_col:
+            summary['delivery_rate'] = delivery_df[delivery_col].mean()
+            if len(delivery_df) > 1:
+                mid_point = len(delivery_df) // 2
+                current_period = delivery_df.iloc[mid_point:][delivery_col].mean()
+                previous_period = delivery_df.iloc[:mid_point][delivery_col].mean()
+                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                summary['delivery_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+            else:
+                summary['delivery_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
-    if ctr_file and not filtered_data[ctr_file].empty:
-        ctr_df = filtered_data[ctr_file]
-        # Find CTR column
+    # 3. Open Rate (%)
+    if 'opens' in files and not files['opens'].empty:
+        opens_df = files['opens']
+        opens_col = None
+        for col in opens_df.columns:
+            if ('open' in col.lower() or 'rate' in col.lower()) and col.lower() != 'timestamp':
+                opens_col = col
+                break
+        
+        if opens_col:
+            summary['open_rate'] = opens_df[opens_col].mean()
+            if len(opens_df) > 1:
+                mid_point = len(opens_df) // 2
+                current_period = opens_df.iloc[mid_point:][opens_col].mean()
+                previous_period = opens_df.iloc[:mid_point][opens_col].mean()
+                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                summary['open_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+            else:
+                summary['open_trend'] = {'percentage': 0, 'direction': 'neutral'}
+    
+    # 4. Click-Through Rate (%)
+    if 'ctr' in files and not files['ctr'].empty:
+        ctr_df = files['ctr']
         ctr_col = None
         for col in ctr_df.columns:
             if 'ctr' in col.lower() and col.lower() != 'timestamp':
@@ -206,7 +255,7 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
                 break
         
         if ctr_col:
-            summary['avg_ctr'] = ctr_df[ctr_col].mean()
+            summary['ctr'] = ctr_df[ctr_col].mean()
             if len(ctr_df) > 1:
                 mid_point = len(ctr_df) // 2
                 current_period = ctr_df.iloc[mid_point:][ctr_col].mean()
@@ -216,86 +265,88 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
             else:
                 summary['ctr_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
-    # 3. Delivery rate metrics from pushdeliveryrate file
-    delivery_file = None
-    for filename in filtered_data.keys():
-        if 'pushdeliveryrate' in filename.lower():
-            delivery_file = filename
-            break
-    
-    if delivery_file and not filtered_data[delivery_file].empty:
-        delivery_df = filtered_data[delivery_file]
-        # Find delivery rate column
-        delivery_col = None
-        for col in delivery_df.columns:
-            if 'delivery' in col.lower() and col.lower() != 'timestamp':
-                delivery_col = col
-                break
+    # 5. Conversion Rate (%)
+    if 'purchases' in files and 'ctr' in files:
+        purchases_df = files['purchases']
+        ctr_df = files['ctr']
         
-        if delivery_col:
-            summary['avg_delivery_rate'] = delivery_df[delivery_col].mean()
-            if len(delivery_df) > 1:
-                mid_point = len(delivery_df) // 2
-                current_period = delivery_df.iloc[mid_point:][delivery_col].mean()
-                previous_period = delivery_df.iloc[:mid_point][delivery_col].mean()
-                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                summary['delivery_rate_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
-            else:
-                summary['delivery_rate_trend'] = {'percentage': 0, 'direction': 'neutral'}
-    
-    # 4. AOV metrics from pushaov file
-    aov_file = None
-    for filename in filtered_data.keys():
-        if 'pushaov' in filename.lower():
-            aov_file = filename
-            break
-    
-    if aov_file and not filtered_data[aov_file].empty:
-        aov_df = filtered_data[aov_file]
-        # Find AOV column
-        aov_col = None
-        for col in aov_df.columns:
-            if 'aov' in col.lower() and col.lower() != 'timestamp':
-                aov_col = col
-                break
-        
-        if aov_col:
-            summary['avg_aov'] = aov_df[aov_col].mean()
-            if len(aov_df) > 1:
-                mid_point = len(aov_df) // 2
-                current_period = aov_df.iloc[mid_point:][aov_col].mean()
-                previous_period = aov_df.iloc[:mid_point][aov_col].mean()
-                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                summary['aov_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
-            else:
-                summary['aov_trend'] = {'percentage': 0, 'direction': 'neutral'}
-    
-    # 5. Purchase metrics from noofpurchasesattributedtopush file
-    purchases_file = None
-    for filename in filtered_data.keys():
-        if 'noofpurchasesattributedtopush' in filename.lower():
-            purchases_file = filename
-            break
-    
-    if purchases_file and not filtered_data[purchases_file].empty:
-        purchases_df = filtered_data[purchases_file]
-        # Find purchases column
         purchases_col = None
         for col in purchases_df.columns:
             if 'purchase' in col.lower() and col.lower() != 'timestamp':
                 purchases_col = col
                 break
         
-        if purchases_col:
-            summary['total_purchases'] = purchases_df[purchases_col].sum()
-            if len(purchases_df) > 1:
-                mid_point = len(purchases_df) // 2
-                current_period = purchases_df.iloc[mid_point:][purchases_col].sum()
-                previous_period = purchases_df.iloc[:mid_point][purchases_col].sum()
+        ctr_col = None
+        for col in ctr_df.columns:
+            if 'ctr' in col.lower() and col.lower() != 'timestamp':
+                ctr_col = col
+                break
+        
+        if purchases_col and ctr_col:
+            # Calculate conversion rate as purchases / clicks (simplified)
+            total_purchases = purchases_df[purchases_col].sum()
+            avg_ctr = ctr_df[ctr_col].mean()
+            # Estimate clicks from CTR and calculate conversion rate
+            if avg_ctr > 0:
+                estimated_clicks = total_purchases / (avg_ctr / 100)  # Rough estimate
+                conversion_rate = (total_purchases / estimated_clicks * 100) if estimated_clicks > 0 else 0
+                summary['conversion_rate'] = conversion_rate
+                
+                if len(purchases_df) > 1:
+                    mid_point = len(purchases_df) // 2
+                    current_period = purchases_df.iloc[mid_point:][purchases_col].sum()
+                    previous_period = purchases_df.iloc[:mid_point][purchases_col].sum()
+                    trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                    summary['conversion_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+                else:
+                    summary['conversion_trend'] = {'percentage': 0, 'direction': 'neutral'}
+    
+    # 6. Revenue from Push (AED)
+    if 'revenue' in files and not files['revenue'].empty:
+        revenue_df = files['revenue']
+        revenue_col = None
+        for col in revenue_df.columns:
+            if 'revenue' in col.lower() and col.lower() != 'timestamp':
+                revenue_col = col
+                break
+        
+        if revenue_col:
+            summary['revenue_from_push'] = revenue_df[revenue_col].sum()
+            if len(revenue_df) > 1:
+                mid_point = len(revenue_df) // 2
+                current_period = revenue_df.iloc[mid_point:][revenue_col].sum()
+                previous_period = revenue_df.iloc[:mid_point][revenue_col].sum()
                 trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                summary['purchases_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+                summary['revenue_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
             else:
-                summary['purchases_trend'] = {'percentage': 0, 'direction': 'neutral'}
+                summary['revenue_trend'] = {'percentage': 0, 'direction': 'neutral'}
+    
+    # 7. Opt-out Rate (%)
+    if 'optout' in files and not files['optout'].empty:
+        optout_df = files['optout']
+        optout_col = None
+        for col in optout_df.columns:
+            if ('optout' in col.lower() or 'unsubscribe' in col.lower()) and col.lower() != 'timestamp':
+                optout_col = col
+                break
+        
+        if optout_col:
+            summary['optout_rate'] = optout_df[optout_col].mean()
+            if len(optout_df) > 1:
+                mid_point = len(optout_df) // 2
+                current_period = optout_df.iloc[mid_point:][optout_col].mean()
+                previous_period = optout_df.iloc[:mid_point][optout_col].mean()
+                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                summary['optout_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+            else:
+                summary['optout_trend'] = {'percentage': 0, 'direction': 'neutral'}
+    
+    # 8. Top Performing Campaigns
+    if 'campaigns' in files and not files['campaigns'].empty:
+        campaigns_df = files['campaigns']
+        # Count active campaigns (simplified - count rows)
+        summary['top_campaigns_count'] = len(campaigns_df)
+        summary['campaigns_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
     return summary
 
