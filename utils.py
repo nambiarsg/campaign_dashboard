@@ -300,10 +300,10 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
     return summary
 
 def format_currency(value: float) -> str:
-    """Format value as currency"""
+    """Format value as currency (AED)"""
     if pd.isna(value):
-        return "$0"
-    return f"${value:,.2f}"
+        return "0"
+    return f"{value:,.2f}"
 
 def format_number(value: float) -> str:
     """Format value as number with commas"""

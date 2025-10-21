@@ -250,7 +250,7 @@ def render_metrics_cards():
         aov = summary.get('avg_aov', 0)
         aov_trend = summary.get('aov_trend', {})
         render_metric_card(
-            "Average AOV",
+            "Average AOV (Average Order Value)",
             format_currency(aov),
             aov_trend,
             "💳"
@@ -261,7 +261,7 @@ def render_metrics_cards():
         ctr = summary.get('avg_ctr', 0)
         ctr_trend = summary.get('ctr_trend', {})
         render_metric_card(
-            "Average CTR",
+            "Average CTR (Click Through Rate)",
             format_percentage(ctr),
             ctr_trend,
             "👆"
@@ -313,6 +313,9 @@ def render_revenue_trend_chart():
         revenue_df_sorted = revenue_df.sort_values(timestamp_col)
         if len(revenue_df_sorted) > 60:
             revenue_df_sorted = revenue_df_sorted.tail(60)
+        
+        # Remove any rows with null timestamps
+        revenue_df_sorted = revenue_df_sorted.dropna(subset=[timestamp_col])
     
     if revenue_df_sorted.empty:
         return
@@ -327,7 +330,7 @@ def render_revenue_trend_chart():
     
     fig.update_layout(
         xaxis_title="Date",
-        yaxis_title="Revenue ($)",
+        yaxis_title="Revenue (AED)",
         hovermode='x unified',
         showlegend=False,
         height=400
@@ -376,6 +379,9 @@ def render_purchases_trend_chart():
         purchases_df_sorted = purchases_df.sort_values(timestamp_col)
         if len(purchases_df_sorted) > 60:
             purchases_df_sorted = purchases_df_sorted.tail(60)
+        
+        # Remove any rows with null timestamps
+        purchases_df_sorted = purchases_df_sorted.dropna(subset=[timestamp_col])
     
     if purchases_df_sorted.empty:
         return
