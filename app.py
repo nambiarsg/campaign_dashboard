@@ -15,9 +15,9 @@ from typing import Dict, List, Tuple
 # Import custom modules
 from config import COLORS, CHART_COLORS, THRESHOLDS, CUSTOM_CSS, CHART_CONFIG, DATE_RANGES
 from utils import (
-    process_csv_file, calculate_metrics_summary, validate_uploaded_files,
+    process_csv_file, calculate_metrics_summary,
     format_currency, format_number, format_percentage, get_trend_arrow,
-    get_date_range_data
+    get_date_range_data, parse_percentage, parse_timestamp
 )
 
 # Page configuration
@@ -79,38 +79,52 @@ def render_sidebar():
         help="Upload all required CSV files for analysis"
     )
     
-    # Process uploaded files
+    # Process uploaded files - NO VALIDATION, just process whatever is uploaded
     if uploaded_files:
-        # Process and store data without validation
         processed_data = {}
         for uploaded_file in uploaded_files:
             try:
                 df = pd.read_csv(uploaded_file)
-                # Simple processing - just parse percentages and timestamps
                 processed_df = df.copy()
                 
                 # Try to parse percentage columns
                 for col in processed_df.columns:
                     if processed_df[col].dtype == 'object':
-                        # Check if column contains percentage values
-                        sample_values = processed_df[col].dropna().head(5)
-                        if any('%' in str(val) for val in sample_values):
-                            processed_df[col] = processed_df[col].apply(lambda x: parse_percentage(str(x)) if pd.notna(x) else 0)
+                        try:
+                            # Check if column contains percentage values
+                            sample_values = processed_df[col].dropna().head(5)
+                            if any('%' in str(val) for val in sample_values):
+                                processed_df[col] = processed_df[col].apply(lambda x: parse_percentage(str(x)) if pd.notna(x) else 0)
+                        except:
+                            pass  # Skip if parsing fails
                 
                 # Try to parse timestamp columns
                 for col in processed_df.columns:
                     if 'timestamp' in col.lower() or 'date' in col.lower():
-                        processed_df[col] = processed_df[col].apply(parse_timestamp)
+                        try:
+                            processed_df[col] = processed_df[col].apply(parse_timestamp)
+                        except:
+                            pass  # Skip if parsing fails
                 
                 processed_data[uploaded_file.name] = processed_df
-                st.sidebar.success(f"✅ {uploaded_file.name} processed successfully")
+                st.sidebar.success(f"✅ {uploaded_file.name} uploaded successfully")
+                
             except Exception as e:
-                st.sidebar.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
+                st.sidebar.warning(f"⚠️ Could not process {uploaded_file.name}: {str(e)}")
+                # Still add the file even if processing fails
+                try:
+                    processed_data[uploaded_file.name] = pd.read_csv(uploaded_file)
+                except:
+                    pass
         
         if processed_data:
             st.session_state.uploaded_data = processed_data
             st.session_state.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            st.sidebar.success("🎉 All files processed successfully!")
+            st.sidebar.success("🎉 Files uploaded successfully!")
+            
+            # Add button to view dashboard
+            if st.sidebar.button("📊 View Dashboard", type="primary"):
+                st.rerun()
     
     # Date range filter
     st.sidebar.markdown("### 📅 Date Range Filter")

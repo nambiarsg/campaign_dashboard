@@ -283,46 +283,4 @@ def get_trend_arrow(direction: str) -> str:
     else:
         return "➡️"
 
-def validate_uploaded_files(uploaded_files: List) -> Tuple[bool, List[str]]:
-    """
-    Validate uploaded files for required columns
-    Returns: (is_valid, error_messages)
-    """
-    errors = []
-    required_files = [
-        'aovmobilepush.csv',
-        'ctrrate.csv', 
-        'deliveryrate.csv',
-        'noofcustomerswithpurchasesattributedtopush.csv',
-        'noofpurchasesattributedtopush.csv',
-        'promotionalcampaignlevelperformancepush.csv',
-        'revenue.csv'
-    ]
-    
-    uploaded_filenames = [f.name for f in uploaded_files]
-    
-    # Check if all required files are uploaded
-    missing_files = [f for f in required_files if f not in uploaded_filenames]
-    if missing_files:
-        errors.append(f"Missing required files: {', '.join(missing_files)}")
-    
-    # Validate each uploaded file
-    for uploaded_file in uploaded_files:
-        try:
-            df = pd.read_csv(uploaded_file)
-            filename = uploaded_file.name
-            
-            if filename in required_files:
-                from config import FILE_COLUMNS
-                # Get the actual column names that should be in the CSV files
-                expected_columns = list(FILE_COLUMNS[filename].values())
-                actual_columns = list(df.columns)
-                missing_columns = [col for col in expected_columns if col not in actual_columns]
-                
-                if missing_columns:
-                    errors.append(f"{filename}: Missing columns {missing_columns}. Found columns: {actual_columns}")
-        
-        except Exception as e:
-            errors.append(f"Error reading {uploaded_file.name}: {str(e)}")
-    
-    return len(errors) == 0, errors
+# Validation function removed - dashboard now accepts any CSV files
