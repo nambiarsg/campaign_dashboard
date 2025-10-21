@@ -57,16 +57,18 @@ def render_sidebar():
     st.sidebar.markdown("### 📁 Upload Data Files")
     st.sidebar.markdown("""
     <div class="upload-section">
-        <p><strong>Required Files:</strong></p>
+        <p><strong>Upload your CSV files:</strong></p>
+        <p>The dashboard will automatically detect and analyze:</p>
         <ul>
-            <li>aovmobilepush.csv</li>
-            <li>ctrrate.csv</li>
-            <li>deliveryrate.csv</li>
-            <li>noofcustomerswithpurchasesattributedtopush.csv</li>
-            <li>noofpurchasesattributedtopush.csv</li>
-            <li>promotionalcampaignlevelperformancepush.csv</li>
-            <li>revenue.csv</li>
+            <li>Revenue data</li>
+            <li>Purchase data</li>
+            <li>Buyer data</li>
+            <li>AOV data</li>
+            <li>CTR data</li>
+            <li>Delivery rate data</li>
+            <li>Campaign performance data</li>
         </ul>
+        <p><em>Any CSV with relevant column names will work!</em></p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -79,28 +81,36 @@ def render_sidebar():
     
     # Process uploaded files
     if uploaded_files:
-        # Validate files
-        is_valid, errors = validate_uploaded_files(uploaded_files)
+        # Process and store data without validation
+        processed_data = {}
+        for uploaded_file in uploaded_files:
+            try:
+                df = pd.read_csv(uploaded_file)
+                # Simple processing - just parse percentages and timestamps
+                processed_df = df.copy()
+                
+                # Try to parse percentage columns
+                for col in processed_df.columns:
+                    if processed_df[col].dtype == 'object':
+                        # Check if column contains percentage values
+                        sample_values = processed_df[col].dropna().head(5)
+                        if any('%' in str(val) for val in sample_values):
+                            processed_df[col] = processed_df[col].apply(lambda x: parse_percentage(str(x)) if pd.notna(x) else 0)
+                
+                # Try to parse timestamp columns
+                for col in processed_df.columns:
+                    if 'timestamp' in col.lower() or 'date' in col.lower():
+                        processed_df[col] = processed_df[col].apply(parse_timestamp)
+                
+                processed_data[uploaded_file.name] = processed_df
+                st.sidebar.success(f"✅ {uploaded_file.name} processed successfully")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
         
-        if not is_valid:
-            for error in errors:
-                st.sidebar.error(f"❌ {error}")
-        else:
-            # Process and store data
-            processed_data = {}
-            for uploaded_file in uploaded_files:
-                try:
-                    df = pd.read_csv(uploaded_file)
-                    processed_df = process_csv_file(df, uploaded_file.name)
-                    processed_data[uploaded_file.name] = processed_df
-                    st.sidebar.success(f"✅ {uploaded_file.name} processed successfully")
-                except Exception as e:
-                    st.sidebar.error(f"❌ Error processing {uploaded_file.name}: {str(e)}")
-            
-            if processed_data:
-                st.session_state.uploaded_data = processed_data
-                st.session_state.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                st.sidebar.success("🎉 All files processed successfully!")
+        if processed_data:
+            st.session_state.uploaded_data = processed_data
+            st.session_state.last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            st.sidebar.success("🎉 All files processed successfully!")
     
     # Date range filter
     st.sidebar.markdown("### 📅 Date Range Filter")
@@ -258,10 +268,32 @@ def render_metrics_cards():
 
 def render_revenue_chart():
     """Render revenue trend chart"""
-    if not hasattr(st.session_state, 'uploaded_data') or 'revenue.csv' not in st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data'):
         return
     
-    revenue_df = st.session_state.uploaded_data['revenue.csv']
+    # Find revenue data in any file
+    revenue_df = None
+    revenue_col = None
+    timestamp_col = None
+    
+    for filename, df in st.session_state.uploaded_data.items():
+        if df.empty:
+            continue
+        for col in df.columns:
+            if 'revenue' in col.lower() and df[col].dtype in ['int64', 'float64']:
+                revenue_df = df
+                revenue_col = col
+                # Find timestamp column
+                for ts_col in df.columns:
+                    if 'timestamp' in ts_col.lower() or 'date' in ts_col.lower():
+                        timestamp_col = ts_col
+                        break
+                break
+        if revenue_df is not None:
+            break
+    
+    if revenue_df is None or revenue_col is None or timestamp_col is None:
+        return
     
     # Apply date filter if set
     if st.session_state.get('date_range'):
@@ -273,8 +305,8 @@ def render_revenue_chart():
     
     fig = px.line(
         revenue_df,
-        x='timestamp',
-        y='value',
+        x=timestamp_col,
+        y=revenue_col,
         title='Revenue Trend Over Time',
         color_discrete_sequence=[CHART_COLORS['revenue']]
     )
