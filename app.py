@@ -46,7 +46,7 @@ def render_header():
     </div>
     """, unsafe_allow_html=True)
     
-    if st.session_state.last_updated:
+    if hasattr(st.session_state, 'last_updated') and st.session_state.last_updated:
         st.caption(f"Last updated: {st.session_state.last_updated}")
 
 def render_sidebar():
@@ -105,7 +105,7 @@ def render_sidebar():
     # Date range filter
     st.sidebar.markdown("### 📅 Date Range Filter")
     
-    if st.session_state.uploaded_data:
+    if hasattr(st.session_state, 'uploaded_data') and st.session_state.uploaded_data:
         # Get date range from data
         all_dates = []
         for df in st.session_state.uploaded_data.values():
@@ -147,12 +147,13 @@ def render_sidebar():
                 st.session_state.date_range = (start_date, end_date)
     
     # Clear data button
-    if st.session_state.uploaded_data:
+    if hasattr(st.session_state, 'uploaded_data') and st.session_state.uploaded_data:
         st.sidebar.markdown("### 🗑️ Data Management")
         if st.sidebar.button("Clear All Data", type="secondary"):
             st.session_state.uploaded_data = {}
             st.session_state.last_updated = None
-            st.session_state.date_range = None
+            if hasattr(st.session_state, 'date_range'):
+                st.session_state.date_range = None
             st.rerun()
 
 def render_metric_card(title: str, value: str, trend: Dict = None, icon: str = "📊"):
@@ -182,7 +183,7 @@ def render_metric_card(title: str, value: str, trend: Dict = None, icon: str = "
 
 def render_metrics_cards():
     """Render the key metrics cards"""
-    if not st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data') or not st.session_state.uploaded_data:
         return
     
     # Calculate metrics
@@ -257,7 +258,7 @@ def render_metrics_cards():
 
 def render_revenue_chart():
     """Render revenue trend chart"""
-    if 'revenue.csv' not in st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data') or 'revenue.csv' not in st.session_state.uploaded_data:
         return
     
     revenue_df = st.session_state.uploaded_data['revenue.csv']
@@ -295,6 +296,8 @@ def render_revenue_chart():
 
 def render_purchases_buyers_chart():
     """Render purchases and buyers dual-axis chart"""
+    if not hasattr(st.session_state, 'uploaded_data'):
+        return
     purchases_df = st.session_state.uploaded_data.get('noofpurchasesattributedtopush.csv', pd.DataFrame())
     buyers_df = st.session_state.uploaded_data.get('noofcustomerswithpurchasesattributedtopush.csv', pd.DataFrame())
     
@@ -352,6 +355,8 @@ def render_purchases_buyers_chart():
 
 def render_ctr_delivery_chart():
     """Render CTR and delivery rate chart"""
+    if not hasattr(st.session_state, 'uploaded_data'):
+        return
     ctr_df = st.session_state.uploaded_data.get('ctrrate.csv', pd.DataFrame())
     delivery_df = st.session_state.uploaded_data.get('deliveryrate.csv', pd.DataFrame())
     
@@ -400,7 +405,7 @@ def render_ctr_delivery_chart():
 
 def render_aov_chart():
     """Render AOV area chart"""
-    if 'aovmobilepush.csv' not in st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data') or 'aovmobilepush.csv' not in st.session_state.uploaded_data:
         return
     
     aov_df = st.session_state.uploaded_data['aovmobilepush.csv']
@@ -433,7 +438,7 @@ def render_aov_chart():
 
 def render_campaign_performance_table():
     """Render campaign performance table"""
-    if 'promotionalcampaignlevelperformancepush.csv' not in st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data') or 'promotionalcampaignlevelperformancepush.csv' not in st.session_state.uploaded_data:
         return
     
     campaign_df = st.session_state.uploaded_data['promotionalcampaignlevelperformancepush.csv']
@@ -482,7 +487,7 @@ def render_campaign_performance_table():
 
 def render_campaign_performance_chart():
     """Render top campaigns bar chart"""
-    if 'promotionalcampaignlevelperformancepush.csv' not in st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data') or 'promotionalcampaignlevelperformancepush.csv' not in st.session_state.uploaded_data:
         return
     
     campaign_df = st.session_state.uploaded_data['promotionalcampaignlevelperformancepush.csv']
@@ -514,7 +519,7 @@ def render_campaign_performance_chart():
 
 def render_download_section():
     """Render download reports section"""
-    if not st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data') or not st.session_state.uploaded_data:
         return
     
     st.markdown("### 📥 Download Reports")
@@ -575,7 +580,7 @@ def main():
     render_sidebar()
     
     # Check if data is uploaded
-    if not st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data') or not st.session_state.uploaded_data:
         render_empty_state()
         return
     
