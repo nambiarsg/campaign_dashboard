@@ -80,7 +80,7 @@ DATE_RANGES = {
     'All Time': None
 }
 
-# CSS styles - Modern Professional Dashboard
+# CSS styles - Modern Professional Dashboard (Updated: 2024-11-21)
 CUSTOM_CSS = """
 <style>
     /* Hide Streamlit default elements */
