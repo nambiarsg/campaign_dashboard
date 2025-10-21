@@ -149,7 +149,7 @@ def get_date_range_data(df: pd.DataFrame, start_date: datetime, end_date: dateti
 
 def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[datetime, datetime] = None) -> Dict:
     """
-    Calculate summary metrics from all uploaded data - flexible approach
+    Calculate summary metrics from uploaded data based on specific file requirements
     """
     summary = {}
     
@@ -162,97 +162,110 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
     else:
         filtered_data = data
     
-    # Process each file and extract metrics based on column names
-    for filename, df in filtered_data.items():
-        if df.empty:
-            continue
-            
-        # Find numeric columns (excluding timestamp columns)
-        numeric_cols = []
-        timestamp_cols = []
+    # 1. Revenue metrics from push revenue.csv
+    if 'push revenue.csv' in filtered_data and not filtered_data['push revenue.csv'].empty:
+        revenue_df = filtered_data['push revenue.csv']
+        # Find revenue column
+        revenue_col = None
+        for col in revenue_df.columns:
+            if 'revenue' in col.lower() and col.lower() != 'timestamp':
+                revenue_col = col
+                break
         
-        for col in df.columns:
-            if df[col].dtype in ['int64', 'float64'] or 'revenue' in col.lower() or 'purchase' in col.lower() or 'buyer' in col.lower() or 'aov' in col.lower() or 'ctr' in col.lower() or 'delivery' in col.lower():
-                if 'timestamp' not in col.lower() and 'date' not in col.lower():
-                    numeric_cols.append(col)
-            elif 'timestamp' in col.lower() or 'date' in col.lower():
-                timestamp_cols.append(col)
+        if revenue_col:
+            summary['total_revenue'] = revenue_df[revenue_col].sum()
+            if len(revenue_df) > 1:
+                mid_point = len(revenue_df) // 2
+                current_period = revenue_df.iloc[mid_point:][revenue_col].sum()
+                previous_period = revenue_df.iloc[:mid_point][revenue_col].sum()
+                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                summary['revenue_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+            else:
+                summary['revenue_trend'] = {'percentage': 0, 'direction': 'neutral'}
+    
+    # 2. CTR metrics from pushctr.csv
+    if 'pushctr.csv' in filtered_data and not filtered_data['pushctr.csv'].empty:
+        ctr_df = filtered_data['pushctr.csv']
+        # Find CTR column
+        ctr_col = None
+        for col in ctr_df.columns:
+            if 'ctr' in col.lower() and col.lower() != 'timestamp':
+                ctr_col = col
+                break
         
-        # Calculate metrics for each numeric column
-        for col in numeric_cols:
-            col_lower = col.lower()
-            
-            # Revenue metrics
-            if 'revenue' in col_lower:
-                summary['total_revenue'] = df[col].sum()
-                if len(df) > 1:
-                    mid_point = len(df) // 2
-                    current_period = df.iloc[mid_point:][col].sum()
-                    previous_period = df.iloc[:mid_point][col].sum()
-                    trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                    summary['revenue_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
-                else:
-                    summary['revenue_trend'] = {'percentage': 0, 'direction': 'neutral'}
-            
-            # Purchase metrics
-            elif 'purchase' in col_lower:
-                summary['total_purchases'] = df[col].sum()
-                if len(df) > 1:
-                    mid_point = len(df) // 2
-                    current_period = df.iloc[mid_point:][col].sum()
-                    previous_period = df.iloc[:mid_point][col].sum()
-                    trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                    summary['purchases_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
-                else:
-                    summary['purchases_trend'] = {'percentage': 0, 'direction': 'neutral'}
-            
-            # Buyer metrics
-            elif 'buyer' in col_lower:
-                summary['total_buyers'] = df[col].sum()
-                if len(df) > 1:
-                    mid_point = len(df) // 2
-                    current_period = df.iloc[mid_point:][col].sum()
-                    previous_period = df.iloc[:mid_point][col].sum()
-                    trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                    summary['buyers_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
-                else:
-                    summary['buyers_trend'] = {'percentage': 0, 'direction': 'neutral'}
-            
-            # AOV metrics
-            elif 'aov' in col_lower:
-                summary['avg_aov'] = df[col].mean()
-                if len(df) > 1:
-                    mid_point = len(df) // 2
-                    current_period = df.iloc[mid_point:][col].mean()
-                    previous_period = df.iloc[:mid_point][col].mean()
-                    trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                    summary['aov_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
-                else:
-                    summary['aov_trend'] = {'percentage': 0, 'direction': 'neutral'}
-            
-            # CTR metrics
-            elif 'ctr' in col_lower or 'click' in col_lower:
-                summary['avg_ctr'] = df[col].mean()
-                if len(df) > 1:
-                    mid_point = len(df) // 2
-                    current_period = df.iloc[mid_point:][col].mean()
-                    previous_period = df.iloc[:mid_point][col].mean()
-                    trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                    summary['ctr_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
-                else:
-                    summary['ctr_trend'] = {'percentage': 0, 'direction': 'neutral'}
-            
-            # Delivery rate metrics
-            elif 'delivery' in col_lower:
-                summary['avg_delivery_rate'] = df[col].mean()
-                if len(df) > 1:
-                    mid_point = len(df) // 2
-                    current_period = df.iloc[mid_point:][col].mean()
-                    previous_period = df.iloc[:mid_point][col].mean()
-                    trend_pct, trend_dir = calculate_trend(current_period, previous_period)
-                    summary['delivery_rate_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
-                else:
-                    summary['delivery_rate_trend'] = {'percentage': 0, 'direction': 'neutral'}
+        if ctr_col:
+            summary['avg_ctr'] = ctr_df[ctr_col].mean()
+            if len(ctr_df) > 1:
+                mid_point = len(ctr_df) // 2
+                current_period = ctr_df.iloc[mid_point:][ctr_col].mean()
+                previous_period = ctr_df.iloc[:mid_point][ctr_col].mean()
+                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                summary['ctr_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+            else:
+                summary['ctr_trend'] = {'percentage': 0, 'direction': 'neutral'}
+    
+    # 3. Delivery rate metrics from pushdeliveryrate.csv
+    if 'pushdeliveryrate.csv' in filtered_data and not filtered_data['pushdeliveryrate.csv'].empty:
+        delivery_df = filtered_data['pushdeliveryrate.csv']
+        # Find delivery rate column
+        delivery_col = None
+        for col in delivery_df.columns:
+            if 'delivery' in col.lower() and col.lower() != 'timestamp':
+                delivery_col = col
+                break
+        
+        if delivery_col:
+            summary['avg_delivery_rate'] = delivery_df[delivery_col].mean()
+            if len(delivery_df) > 1:
+                mid_point = len(delivery_df) // 2
+                current_period = delivery_df.iloc[mid_point:][delivery_col].mean()
+                previous_period = delivery_df.iloc[:mid_point][delivery_col].mean()
+                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                summary['delivery_rate_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+            else:
+                summary['delivery_rate_trend'] = {'percentage': 0, 'direction': 'neutral'}
+    
+    # 4. AOV metrics from pushaov.csv
+    if 'pushaov.csv' in filtered_data and not filtered_data['pushaov.csv'].empty:
+        aov_df = filtered_data['pushaov.csv']
+        # Find AOV column
+        aov_col = None
+        for col in aov_df.columns:
+            if 'aov' in col.lower() and col.lower() != 'timestamp':
+                aov_col = col
+                break
+        
+        if aov_col:
+            summary['avg_aov'] = aov_df[aov_col].mean()
+            if len(aov_df) > 1:
+                mid_point = len(aov_df) // 2
+                current_period = aov_df.iloc[mid_point:][aov_col].mean()
+                previous_period = aov_df.iloc[:mid_point][aov_col].mean()
+                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                summary['aov_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+            else:
+                summary['aov_trend'] = {'percentage': 0, 'direction': 'neutral'}
+    
+    # 5. Purchase metrics from noofpurchasesattributedtopush.csv
+    if 'noofpurchasesattributedtopush.csv' in filtered_data and not filtered_data['noofpurchasesattributedtopush.csv'].empty:
+        purchases_df = filtered_data['noofpurchasesattributedtopush.csv']
+        # Find purchases column
+        purchases_col = None
+        for col in purchases_df.columns:
+            if 'purchase' in col.lower() and col.lower() != 'timestamp':
+                purchases_col = col
+                break
+        
+        if purchases_col:
+            summary['total_purchases'] = purchases_df[purchases_col].sum()
+            if len(purchases_df) > 1:
+                mid_point = len(purchases_df) // 2
+                current_period = purchases_df.iloc[mid_point:][purchases_col].sum()
+                previous_period = purchases_df.iloc[:mid_point][purchases_col].sum()
+                trend_pct, trend_dir = calculate_trend(current_period, previous_period)
+                summary['purchases_trend'] = {'percentage': trend_pct, 'direction': trend_dir}
+            else:
+                summary['purchases_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
     return summary
 

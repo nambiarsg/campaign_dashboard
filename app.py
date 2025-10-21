@@ -57,18 +57,14 @@ def render_sidebar():
     st.sidebar.markdown("### 📁 Upload Data Files")
     st.sidebar.markdown("""
     <div class="upload-section">
-        <p><strong>Upload your CSV files:</strong></p>
-        <p>The dashboard will automatically detect and analyze:</p>
+        <p><strong>Required CSV files:</strong></p>
         <ul>
-            <li>Revenue data</li>
-            <li>Purchase data</li>
-            <li>Buyer data</li>
-            <li>AOV data</li>
-            <li>CTR data</li>
-            <li>Delivery rate data</li>
-            <li>Campaign performance data</li>
+            <li><strong>push revenue.csv</strong><br/>Columns: timestamp, revenue</li>
+            <li><strong>pushctr.csv</strong><br/>Columns: timestamp, ctr</li>
+            <li><strong>pushdeliveryrate.csv</strong><br/>Columns: timestamp, delivery rate</li>
+            <li><strong>pushaov.csv</strong><br/>Columns: timestamp, aov</li>
+            <li><strong>noofpurchasesattributedtopush.csv</strong><br/>Columns: timestamp, Purchases</li>
         </ul>
-        <p><em>Any CSV with relevant column names will work!</em></p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -280,54 +276,100 @@ def render_metrics_cards():
             "📨"
         )
 
-def render_revenue_chart():
-    """Render revenue trend chart"""
-    if not hasattr(st.session_state, 'uploaded_data'):
+def render_revenue_trend_chart():
+    """Render revenue trend chart for last 60 days"""
+    if not hasattr(st.session_state, 'uploaded_data') or 'push revenue.csv' not in st.session_state.uploaded_data:
         return
     
-    # Find revenue data in any file
-    revenue_df = None
+    revenue_df = st.session_state.uploaded_data['push revenue.csv']
+    
+    # Find revenue and timestamp columns
     revenue_col = None
     timestamp_col = None
     
-    for filename, df in st.session_state.uploaded_data.items():
-        if df.empty:
-            continue
-        for col in df.columns:
-            if 'revenue' in col.lower() and df[col].dtype in ['int64', 'float64']:
-                revenue_df = df
-                revenue_col = col
-                # Find timestamp column
-                for ts_col in df.columns:
-                    if 'timestamp' in ts_col.lower() or 'date' in ts_col.lower():
-                        timestamp_col = ts_col
-                        break
-                break
-        if revenue_df is not None:
-            break
+    for col in revenue_df.columns:
+        if 'revenue' in col.lower() and col.lower() != 'timestamp':
+            revenue_col = col
+        elif 'timestamp' in col.lower():
+            timestamp_col = col
     
-    if revenue_df is None or revenue_col is None or timestamp_col is None:
+    if revenue_col is None or timestamp_col is None:
         return
     
-    # Apply date filter if set
-    if st.session_state.get('date_range'):
-        start_date, end_date = st.session_state.date_range
-        revenue_df = get_date_range_data(revenue_df, start_date, end_date)
+    # Get last 60 days of data
+    if not revenue_df.empty and timestamp_col in revenue_df.columns:
+        # Sort by timestamp and get last 60 days
+        revenue_df_sorted = revenue_df.sort_values(timestamp_col)
+        if len(revenue_df_sorted) > 60:
+            revenue_df_sorted = revenue_df_sorted.tail(60)
     
-    if revenue_df.empty:
+    if revenue_df_sorted.empty:
         return
     
     fig = px.line(
-        revenue_df,
+        revenue_df_sorted,
         x=timestamp_col,
         y=revenue_col,
-        title='Revenue Trend Over Time',
+        title='Revenue Trend - Last 60 Days',
         color_discrete_sequence=[CHART_COLORS['revenue']]
     )
     
     fig.update_layout(
         xaxis_title="Date",
         yaxis_title="Revenue ($)",
+        hovermode='x unified',
+        showlegend=False,
+        height=400
+    )
+    
+    fig.update_traces(
+        line=dict(width=3),
+        marker=dict(size=6)
+    )
+    
+    st.plotly_chart(fig, use_container_width=True, config=CHART_CONFIG)
+
+def render_purchases_trend_chart():
+    """Render purchases trend chart for last 60 days"""
+    if not hasattr(st.session_state, 'uploaded_data') or 'noofpurchasesattributedtopush.csv' not in st.session_state.uploaded_data:
+        return
+    
+    purchases_df = st.session_state.uploaded_data['noofpurchasesattributedtopush.csv']
+    
+    # Find purchases and timestamp columns
+    purchases_col = None
+    timestamp_col = None
+    
+    for col in purchases_df.columns:
+        if 'purchase' in col.lower() and col.lower() != 'timestamp':
+            purchases_col = col
+        elif 'timestamp' in col.lower():
+            timestamp_col = col
+    
+    if purchases_col is None or timestamp_col is None:
+        return
+    
+    # Get last 60 days of data
+    if not purchases_df.empty and timestamp_col in purchases_df.columns:
+        # Sort by timestamp and get last 60 days
+        purchases_df_sorted = purchases_df.sort_values(timestamp_col)
+        if len(purchases_df_sorted) > 60:
+            purchases_df_sorted = purchases_df_sorted.tail(60)
+    
+    if purchases_df_sorted.empty:
+        return
+    
+    fig = px.line(
+        purchases_df_sorted,
+        x=timestamp_col,
+        y=purchases_col,
+        title='Conversion Trend - Last 60 Days',
+        color_discrete_sequence=[CHART_COLORS['purchases']]
+    )
+    
+    fig.update_layout(
+        xaxis_title="Date",
+        yaxis_title="Purchases",
         hovermode='x unified',
         showlegend=False,
         height=400
@@ -631,7 +673,7 @@ def main():
         return
     
     # Render dashboard content
-    st.markdown("## 📊 Key Performance Metrics")
+    st.markdown("## 📊 Section 1: Overall Health")
     render_metrics_cards()
     
     st.markdown("## 📈 Performance Trends")
@@ -640,23 +682,10 @@ def main():
     col1, col2 = st.columns(2)
     
     with col1:
-        render_revenue_chart()
-        render_aov_chart()
+        render_revenue_trend_chart()
     
     with col2:
-        render_purchases_buyers_chart()
-        render_ctr_delivery_chart()
-    
-    # Campaign performance section
-    st.markdown("## 🎯 Campaign Performance")
-    
-    col3, col4 = st.columns([2, 1])
-    
-    with col3:
-        render_campaign_performance_table()
-    
-    with col4:
-        render_campaign_performance_chart()
+        render_purchases_trend_chart()
     
     # Download section
     render_download_section()
