@@ -57,22 +57,23 @@ def render_sidebar():
     st.sidebar.markdown("### 📁 Upload Data Files")
     st.sidebar.markdown("""
     <div class="upload-section">
-        <p><strong>Required CSV files:</strong></p>
+        <p><strong>Required files (any extension):</strong></p>
         <ul>
-            <li><strong>push revenue.csv</strong><br/>Columns: timestamp, revenue</li>
-            <li><strong>pushctr.csv</strong><br/>Columns: timestamp, ctr</li>
-            <li><strong>pushdeliveryrate.csv</strong><br/>Columns: timestamp, delivery rate</li>
-            <li><strong>pushaov.csv</strong><br/>Columns: timestamp, aov</li>
-            <li><strong>noofpurchasesattributedtopush.csv</strong><br/>Columns: timestamp, Purchases</li>
+            <li><strong>push revenue</strong><br/>Columns: timestamp, revenue</li>
+            <li><strong>pushctr</strong><br/>Columns: timestamp, ctr</li>
+            <li><strong>pushdeliveryrate</strong><br/>Columns: timestamp, delivery rate</li>
+            <li><strong>pushaov</strong><br/>Columns: timestamp, aov</li>
+            <li><strong>noofpurchasesattributedtopush</strong><br/>Columns: timestamp, Purchases</li>
         </ul>
+        <p><em>Works with .csv, .numbers, .xlsx, etc.</em></p>
     </div>
     """, unsafe_allow_html=True)
     
     uploaded_files = st.sidebar.file_uploader(
-        "Choose CSV files",
-        type=['csv'],
+        "Choose data files",
+        type=['csv', 'xlsx', 'xls', 'numbers'],
         accept_multiple_files=True,
-        help="Upload all required CSV files for analysis"
+        help="Upload all required data files for analysis"
     )
     
     # Process uploaded files - NO VALIDATION, just process whatever is uploaded
@@ -278,10 +279,20 @@ def render_metrics_cards():
 
 def render_revenue_trend_chart():
     """Render revenue trend chart for last 60 days"""
-    if not hasattr(st.session_state, 'uploaded_data') or 'push revenue.csv' not in st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data'):
         return
     
-    revenue_df = st.session_state.uploaded_data['push revenue.csv']
+    # Find revenue file
+    revenue_file = None
+    for filename in st.session_state.uploaded_data.keys():
+        if 'push revenue' in filename.lower():
+            revenue_file = filename
+            break
+    
+    if not revenue_file:
+        return
+    
+    revenue_df = st.session_state.uploaded_data[revenue_file]
     
     # Find revenue and timestamp columns
     revenue_col = None
@@ -331,10 +342,20 @@ def render_revenue_trend_chart():
 
 def render_purchases_trend_chart():
     """Render purchases trend chart for last 60 days"""
-    if not hasattr(st.session_state, 'uploaded_data') or 'noofpurchasesattributedtopush.csv' not in st.session_state.uploaded_data:
+    if not hasattr(st.session_state, 'uploaded_data'):
         return
     
-    purchases_df = st.session_state.uploaded_data['noofpurchasesattributedtopush.csv']
+    # Find purchases file
+    purchases_file = None
+    for filename in st.session_state.uploaded_data.keys():
+        if 'noofpurchasesattributedtopush' in filename.lower():
+            purchases_file = filename
+            break
+    
+    if not purchases_file:
+        return
+    
+    purchases_df = st.session_state.uploaded_data[purchases_file]
     
     # Find purchases and timestamp columns
     purchases_col = None

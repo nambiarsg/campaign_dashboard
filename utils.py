@@ -162,9 +162,15 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
     else:
         filtered_data = data
     
-    # 1. Revenue metrics from push revenue.csv
-    if 'push revenue.csv' in filtered_data and not filtered_data['push revenue.csv'].empty:
-        revenue_df = filtered_data['push revenue.csv']
+    # 1. Revenue metrics from push revenue file
+    revenue_file = None
+    for filename in filtered_data.keys():
+        if 'push revenue' in filename.lower():
+            revenue_file = filename
+            break
+    
+    if revenue_file and not filtered_data[revenue_file].empty:
+        revenue_df = filtered_data[revenue_file]
         # Find revenue column
         revenue_col = None
         for col in revenue_df.columns:
@@ -183,9 +189,15 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
             else:
                 summary['revenue_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
-    # 2. CTR metrics from pushctr.csv
-    if 'pushctr.csv' in filtered_data and not filtered_data['pushctr.csv'].empty:
-        ctr_df = filtered_data['pushctr.csv']
+    # 2. CTR metrics from pushctr file
+    ctr_file = None
+    for filename in filtered_data.keys():
+        if 'pushctr' in filename.lower():
+            ctr_file = filename
+            break
+    
+    if ctr_file and not filtered_data[ctr_file].empty:
+        ctr_df = filtered_data[ctr_file]
         # Find CTR column
         ctr_col = None
         for col in ctr_df.columns:
@@ -204,9 +216,15 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
             else:
                 summary['ctr_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
-    # 3. Delivery rate metrics from pushdeliveryrate.csv
-    if 'pushdeliveryrate.csv' in filtered_data and not filtered_data['pushdeliveryrate.csv'].empty:
-        delivery_df = filtered_data['pushdeliveryrate.csv']
+    # 3. Delivery rate metrics from pushdeliveryrate file
+    delivery_file = None
+    for filename in filtered_data.keys():
+        if 'pushdeliveryrate' in filename.lower():
+            delivery_file = filename
+            break
+    
+    if delivery_file and not filtered_data[delivery_file].empty:
+        delivery_df = filtered_data[delivery_file]
         # Find delivery rate column
         delivery_col = None
         for col in delivery_df.columns:
@@ -225,9 +243,15 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
             else:
                 summary['delivery_rate_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
-    # 4. AOV metrics from pushaov.csv
-    if 'pushaov.csv' in filtered_data and not filtered_data['pushaov.csv'].empty:
-        aov_df = filtered_data['pushaov.csv']
+    # 4. AOV metrics from pushaov file
+    aov_file = None
+    for filename in filtered_data.keys():
+        if 'pushaov' in filename.lower():
+            aov_file = filename
+            break
+    
+    if aov_file and not filtered_data[aov_file].empty:
+        aov_df = filtered_data[aov_file]
         # Find AOV column
         aov_col = None
         for col in aov_df.columns:
@@ -246,9 +270,15 @@ def calculate_metrics_summary(data: Dict[str, pd.DataFrame], date_range: Tuple[d
             else:
                 summary['aov_trend'] = {'percentage': 0, 'direction': 'neutral'}
     
-    # 5. Purchase metrics from noofpurchasesattributedtopush.csv
-    if 'noofpurchasesattributedtopush.csv' in filtered_data and not filtered_data['noofpurchasesattributedtopush.csv'].empty:
-        purchases_df = filtered_data['noofpurchasesattributedtopush.csv']
+    # 5. Purchase metrics from noofpurchasesattributedtopush file
+    purchases_file = None
+    for filename in filtered_data.keys():
+        if 'noofpurchasesattributedtopush' in filename.lower():
+            purchases_file = filename
+            break
+    
+    if purchases_file and not filtered_data[purchases_file].empty:
+        purchases_df = filtered_data[purchases_file]
         # Find purchases column
         purchases_col = None
         for col in purchases_df.columns:
