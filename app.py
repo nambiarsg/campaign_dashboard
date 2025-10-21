@@ -311,13 +311,13 @@ def render_revenue_trend_chart():
     
     # Get last 60 days of data
     if not revenue_df.empty and timestamp_col in revenue_df.columns:
+        # Remove any rows with null timestamps first
+        revenue_df_clean = revenue_df.dropna(subset=[timestamp_col])
+        
         # Sort by timestamp and get last 60 days
-        revenue_df_sorted = revenue_df.sort_values(timestamp_col)
+        revenue_df_sorted = revenue_df_clean.sort_values(timestamp_col)
         if len(revenue_df_sorted) > 60:
             revenue_df_sorted = revenue_df_sorted.tail(60)
-        
-        # Remove any rows with null timestamps
-        revenue_df_sorted = revenue_df_sorted.dropna(subset=[timestamp_col])
     
     if revenue_df_sorted.empty:
         return
@@ -335,7 +335,13 @@ def render_revenue_trend_chart():
         yaxis_title="Revenue (AED)",
         hovermode='x unified',
         showlegend=False,
-        height=400
+        height=400,
+        xaxis=dict(
+            type='date',
+            tickformat='%b %d, %Y',
+            tickmode='auto',
+            nticks=8
+        )
     )
     
     fig.update_traces(
@@ -377,13 +383,13 @@ def render_purchases_trend_chart():
     
     # Get last 60 days of data
     if not purchases_df.empty and timestamp_col in purchases_df.columns:
+        # Remove any rows with null timestamps first
+        purchases_df_clean = purchases_df.dropna(subset=[timestamp_col])
+        
         # Sort by timestamp and get last 60 days
-        purchases_df_sorted = purchases_df.sort_values(timestamp_col)
+        purchases_df_sorted = purchases_df_clean.sort_values(timestamp_col)
         if len(purchases_df_sorted) > 60:
             purchases_df_sorted = purchases_df_sorted.tail(60)
-        
-        # Remove any rows with null timestamps
-        purchases_df_sorted = purchases_df_sorted.dropna(subset=[timestamp_col])
     
     if purchases_df_sorted.empty:
         return
@@ -401,7 +407,13 @@ def render_purchases_trend_chart():
         yaxis_title="Purchases",
         hovermode='x unified',
         showlegend=False,
-        height=400
+        height=400,
+        xaxis=dict(
+            type='date',
+            tickformat='%b %d, %Y',
+            tickmode='auto',
+            nticks=8
+        )
     )
     
     fig.update_traces(
